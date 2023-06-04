@@ -1,9 +1,30 @@
-from aiohttp import web
+import asyncio
+import datetime
+import os
+
 import aiofiles
+from aiohttp import web
 
 
 async def archive(request):
-    raise NotImplementedError
+    response = web.StreamResponse()
+    name = request.match_info.get('archive_hash', 'archive')
+
+    response.headers['Content-Disposition'] = f'attachment; filename="{name}.zip"'
+
+    await response.prepare(request)
+
+    path = os.path.join('test_photos', name)
+    proc = await asyncio.create_subprocess_exec(
+        'zip', '-r', '-', '.', stdout=asyncio.subprocess.PIPE, cwd=path
+    )
+    while True:
+        if proc.stdout.at_eof():
+            break
+        piece = await proc.stdout.read(n=500)
+        await response.write(piece)
+
+    return response
 
 
 async def handle_index_page(request):
