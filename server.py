@@ -1,5 +1,4 @@
 import asyncio
-import datetime
 import os
 
 import aiofiles
@@ -12,12 +11,16 @@ async def archive(request):
 
     response.headers['Content-Disposition'] = f'attachment; filename="{name}.zip"'
 
+    path = os.path.join('test_photos', name)
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            'zip', '-r', '-', '.', stdout=asyncio.subprocess.PIPE, cwd=path
+        )
+    except FileNotFoundError:
+        return web.HTTPNotFound(text='Архив не существует или был удален.')
+
     await response.prepare(request)
 
-    path = os.path.join('test_photos', name)
-    proc = await asyncio.create_subprocess_exec(
-        'zip', '-r', '-', '.', stdout=asyncio.subprocess.PIPE, cwd=path
-    )
     while True:
         if proc.stdout.at_eof():
             break
