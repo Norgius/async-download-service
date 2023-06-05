@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 async def archive(request):
     response = web.StreamResponse()
     name = request.match_info.get('archive_hash', 'archive')
-    logger.info(f'Trying to download catalog "{name}"')
+    logger.info(f'Trying to download catalog "{name}"\n')
 
     response.headers['Content-Disposition'] = \
         f'attachment; filename="{name}.zip"'
@@ -29,12 +29,21 @@ async def archive(request):
 
     await response.prepare(request)
 
-    while True:
-        if proc.stdout.at_eof():
-            break
-        chunk = await proc.stdout.read(n=50000)
-        logger.info('Sending archive chunk ...')
-        await response.write(chunk)
+    try:
+        while True:
+            if proc.stdout.at_eof():
+                break
+            chunk = await proc.stdout.read(n=50000)
+            logger.info('Sending archive chunk ...')
+            await asyncio.sleep(0.1)
+            await response.write(chunk)
+    finally:
+        try:
+            proc.kill()
+            proc.communicate()
+            logger.info('Download failed\n')
+        except ProcessLookupError:
+            logger.info('Download completed\n')
 
     return response
 
