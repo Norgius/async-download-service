@@ -16,6 +16,8 @@ async def archive(request, path_to_folder, delay):
     name = request.match_info.get('archive_hash', 'archive')
     logger.info(f'Trying to download catalog "{name}"\n')
 
+    response.enable_chunked_encoding()
+
     response.headers['Content-Disposition'] = \
         f'attachment; filename="{name}.zip"'
 
