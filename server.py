@@ -1,14 +1,17 @@
 import os
 import asyncio
 import logging
+import argparse
+from functools import partial
 
 import aiofiles
 from aiohttp import web
+from environs import Env
 
 logger = logging.getLogger(__name__)
 
 
-async def archive(request):
+async def archive(request, path_to_folder, delay):
     response = web.StreamResponse()
     name = request.match_info.get('archive_hash', 'archive')
     logger.info(f'Trying to download catalog "{name}"\n')
@@ -16,7 +19,7 @@ async def archive(request):
     response.headers['Content-Disposition'] = \
         f'attachment; filename="{name}.zip"'
 
-    path = os.path.join('test_photos', name)
+    path = os.path.join(path_to_folder, name)
     try:
         proc = await asyncio.create_subprocess_exec(
             'zip', '-r', '-', '.', stdout=asyncio.subprocess.PIPE, cwd=path
@@ -32,15 +35,17 @@ async def archive(request):
     try:
         while True:
             if proc.stdout.at_eof():
+                await asyncio.sleep(0.05)   # с этой задержкой процесс убивается до блока finally
                 break
             chunk = await proc.stdout.read(n=50000)
             logger.info('Sending archive chunk ...')
-            await asyncio.sleep(0.1)
             await response.write(chunk)
+            if delay:
+                await asyncio.sleep(0.05)
     finally:
         try:
             proc.kill()
-            proc.communicate()
+            await proc.communicate()
             logger.info('Download failed\n')
         except ProcessLookupError:
             logger.info('Download completed\n')
@@ -55,15 +60,34 @@ async def handle_index_page(request):
 
 
 def main():
+    env = Env()
+    env.read_env()
+    path_to_folder = env.str('PATH_TO_FOLDER')
+    parser = argparse.ArgumentParser(
+        description='Программа позволяет скачивать папки с фото архивом',
+    )
+    parser.add_argument('--log', '-l', action=argparse.BooleanOptionalAction,
+                        help='Аргумент активирует логи')
+    parser.add_argument('--delay', '-d', action=argparse.BooleanOptionalAction,
+                        help='Включение задержки при скачивании')
+    args = parser.parse_args()
     logging.basicConfig(
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         level=logging.INFO
     )
     logger.setLevel(logging.INFO)
+    logger.disabled = True if not args.log else False
+
     app = web.Application()
     app.add_routes([
         web.get('/', handle_index_page),
-        web.get('/archive/{archive_hash}/', archive),
+        web.get('/archive/{archive_hash}/',
+                partial(
+                    archive,
+                    path_to_folder=path_to_folder,
+                    delay=args.delay
+                        )
+                ),
     ])
     logger.info('Starting microservice')
     web.run_app(app)
