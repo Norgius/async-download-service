@@ -79,7 +79,7 @@ def main():
         level=logging.INFO
     )
     logger.setLevel(logging.INFO)
-    logger.disabled = True if not args.log else False
+    logger.disabled = not args.log
 
     app = web.Application()
     app.add_routes([
