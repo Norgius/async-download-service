@@ -11,7 +11,8 @@ from environs import Env
 logger = logging.getLogger(__name__)
 
 
-async def archive(request, path_to_folder, delay):
+async def archive(request: web.Request, path_to_folder: str,
+                  delay: bool) -> web.StreamResponse:
     response = web.StreamResponse()
     name = request.match_info.get('archive_hash', 'archive')
     logger.info(f'Trying to download catalog "{name}"\n')
@@ -45,17 +46,17 @@ async def archive(request, path_to_folder, delay):
             if delay:
                 await asyncio.sleep(0.05)
     finally:
-        try:
+        if proc.returncode is not None:
+            logger.info('Download completed\n')
+        else:
             proc.kill()
             await proc.communicate()
             logger.info('Download failed\n')
-        except ProcessLookupError:
-            logger.info('Download completed\n')
 
     return response
 
 
-async def handle_index_page(request):
+async def handle_index_page(request: web.Request) -> web.Response:
     async with aiofiles.open('index.html', mode='r') as index_file:
         index_contents = await index_file.read()
     return web.Response(text=index_contents, content_type='text/html')
