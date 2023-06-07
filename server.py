@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 async def archive(request: web.Request, path_to_folder: str,
                   delay: bool) -> web.StreamResponse:
     response = web.StreamResponse()
-    name = request.match_info.get('archive_hash', 'archive')
+    name = request.match_info['archive_hash']
     logger.info(f'Trying to download catalog "{name}"\n')
 
     response.enable_chunked_encoding()
